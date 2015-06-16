@@ -26,6 +26,7 @@ __all__ = [
 from oslo_config import cfg
 import six
 
+import oslo_devsupport as ods
 from oslo_messaging._drivers import base as driver_base
 from oslo_messaging import _utils as utils
 from oslo_messaging import exceptions
@@ -130,7 +131,13 @@ class _CallContext(object):
         if self.version_cap:
             self._check_version_cap(msg.get('version'))
         try:
-            self.transport._send(self.target, ctxt, msg, retry=self.retry)
+            with ods.messaging_cast(self.target.server,
+                                    self.target.topic,
+                                    msg.get('namespace'),
+                                    msg.get('version'),
+                                    msg['method'],
+                                    msg['args']):
+                self.transport._send(self.target, ctxt, msg, retry=self.retry)
         except driver_base.TransportDriverError as ex:
             raise ClientSendError(self.target, ex)
 
@@ -151,9 +158,15 @@ class _CallContext(object):
             self._check_version_cap(msg.get('version'))
 
         try:
-            result = self.transport._send(self.target, msg_ctxt, msg,
-                                          wait_for_reply=True, timeout=timeout,
-                                          retry=self.retry)
+            with ods.messaging_call(self.target.server,
+                                    self.target.topic,
+                                    msg.get('namespace'),
+                                    msg.get('version'),
+                                    msg['method'],
+                                    msg['args']):
+                result = self.transport._send(self.target, msg_ctxt, msg,
+                                              wait_for_reply=True, timeout=timeout,
+                                              retry=self.retry)
         except driver_base.TransportDriverError as ex:
             raise ClientSendError(self.target, ex)
         return self.serializer.deserialize_entity(ctxt, result)

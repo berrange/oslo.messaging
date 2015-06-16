@@ -30,6 +30,7 @@ import sys
 
 import six
 
+import oslo_devsupport as ods
 from oslo_messaging._i18n import _
 from oslo_messaging import _utils as utils
 from oslo_messaging import localcontext
@@ -168,6 +169,21 @@ class RPCDispatcher(object):
         args = message.get('args', {})
         namespace = message.get('namespace')
         version = message.get('version', '1.0')
+
+        with ods.entry_point():
+            LOG.error("Methdo %s: '%s'" % (type(method), str(method)))
+            with ods.messaging_dispatch(self._target.server,
+                                        self._target.topic,
+                                        namespace,
+                                        version,
+                                        method,
+                                        args):
+                return self._dispatch_message(ctxt, executor_callback,
+                                              method, args,
+                                              namespace, version)
+
+    def _dispatch_message(self, ctxt, executor_callback,
+                          method, args, namespace, version):
 
         found_compatible = False
         for endpoint in self.endpoints:
